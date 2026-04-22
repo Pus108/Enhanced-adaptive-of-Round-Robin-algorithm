@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RR vs Adaptive RR</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50 p-6">
+<div class="max-w-5xl mx-auto bg-white p-6 rounded shadow">
+
+<h1 class="text-2xl font-bold text-center text-indigo-700 mb-6">
+Round Robin vs Adaptive RR
+</h1>
+
+<!-- INPUT -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+
+<input id="arrival" type="number" placeholder="Arrival Time"
+class="border p-2 rounded">
+
+<input id="burst" type="number" placeholder="Burst Time"
+class="border p-2 rounded">
+
+<button onclick="addProcess()"
+class="bg-indigo-600 text-white rounded">
+Add Process
+</button>
+
+</div>
+
+<p class="text-red-600 font-bold mb-4">
+Fixed Time Quantum (RR) = 3
+</p>
+
+<table class="w-full mb-6 text-center">
+<thead class="bg-indigo-600 text-white">
+<tr>
+<th>PID</th><th>Arrival</th><th>Burst</th>
+</tr>
+</thead>
+<tbody id="list"></tbody>
+</table>
+
+<button onclick="run()"
+class="w-full bg-green-600 text-white p-3 rounded">
+Run Simulation
+</button>
+
+<div id="result" class="mt-6 hidden">
+
+<h2 class="text-red-600 font-bold">Standard RR</h2>
+<div id="g1" class="flex h-10 bg-gray-200"></div>
+
+<h2 class="text-indigo-600 font-bold mt-4">Adaptive RR</h2>
+<div id="g2" class="flex h-10 bg-gray-200"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const FIXED_QUANTUM = 3; // 🔒 TRUE FIXED VALUE
+
+let processes = [];
+let pid = 1;
+
+function addProcess() {
+    let a = +arrival.value;
+    let b = +burst.value;
+
+    if (b <= 0) return alert("Invalid burst");
+
+    processes.push({id: pid, arrival:a, burst:b});
+
+    list.innerHTML += `<tr>
+        <td>P${pid}</td><td>${a}</td><td>${b}</td>
+    </tr>`;
+
+    pid++;
+}
+
+function simulate(adaptive) {
+
+    let t=0, q=[], done=[], g=[];
+    let p = processes.map(x=>({...x,rem:x.burst}));
+
+    p.sort((a,b)=>a.arrival-b.arrival);
+
+    while(done.length<p.length){
+
+        p.forEach(x=>{
+            if(x.arrival<=t && x.rem>0 && !q.includes(x) && !done.includes(x))
+                q.push(x);
+        });
+
+        if(q.length==0){t++; continue;}
+
+        let quantum;
+
+        if(adaptive){
+            let sum=q.reduce((a,x)=>a+x.rem,0);
+            quantum=Math.ceil(sum/q.length);
+        }else{
+            quantum=FIXED_QUANTUM; // 🔒 always same
+        }
+
+        let cur=q.shift();
+        let exec=Math.min(cur.rem,quantum);
+
+        g.push({id:cur.id,time:exec});
+
+        cur.rem-=exec;
+        t+=exec;
+
+        p.forEach(x=>{
+            if(x.arrival<=t && x.rem>0 && !q.includes(x) && !done.includes(x) && x!==cur)
+                q.push(x);
+        });
+
+        if(cur.rem>0) q.push(cur);
+        else done.push(cur);
+    }
+
+    return g;
+}
+
+function run(){
+
+    if(processes.length==0) return alert("Add process");
+
+    let s = simulate(false);
+    let a = simulate(true);
+
+    result.classList.remove("hidden");
+
+    draw("g1",s,"bg-red-400");
+    draw("g2",a,"bg-indigo-400");
+}
+
+function draw(id,data,color){
+    let c=document.getElementById(id);
+    c.innerHTML="";
+    let total=data.reduce((a,x)=>a+x.time,0);
+
+    data.forEach(x=>{
+        let w=(x.time/total)*100;
+        c.innerHTML+=`<div style="width:${w}%"
+        class="${color} text-white text-xs flex items-center justify-center">
+        P${x.id}</div>`;
+    });
+}
+
+</script>
+
+</body>
+</html>
